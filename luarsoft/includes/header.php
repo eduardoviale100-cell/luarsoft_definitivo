@@ -103,3 +103,15 @@ if (esAdministrador()) {
         </div>
     </div>
 </header>
+
+<?php if (esAdministrador() && $bdActiva !== 'luarsoft_db_admin' && $bdActiva !== 'luarsoft'): ?>
+<div class="support-mode-banner bg-warning text-dark px-3 py-2 d-flex align-items-center justify-content-between border-bottom shadow-sm" style="font-size: 0.85rem;">
+    <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span class="badge bg-danger text-white"><i class="bi bi-shield-exclamation me-1"></i> MODO SOPORTE</span>
+        <span>Estás auditando y visualizando la base de datos <code class="px-1 bg-white rounded text-dark fw-bold border"><?= h($bdActiva) ?></code>. Cualquier cambio afectará la base de datos de este cliente.</span>
+    </div>
+    <a href="<?= url('modules/usuarios/cambiar_bd.php?bd=luarsoft_db_admin') ?>" class="btn btn-sm btn-dark py-1 px-3 fw-bold text-nowrap ms-2">
+        <i class="bi bi-box-arrow-left me-1"></i> Volver a mi BD (Admin)
+    </a>
+</div>
+<?php endif; ?>

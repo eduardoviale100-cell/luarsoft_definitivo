@@ -101,6 +101,7 @@ function moduloActual(): ?string
     if ($contiene($ruta, '/modules/ordenes/')) { return 'ordenes'; }
     if ($contiene($ruta, '/modules/reportes/')) { return 'reportes'; }
     if ($contiene($ruta, '/modules/usuarios/')) { return 'usuarios'; }
+    if ($contiene($ruta, '/admin/')) { return 'usuarios'; }
     if ($terminaCon($ruta, '/index.php')) { return 'dashboard'; }
 
     return null;

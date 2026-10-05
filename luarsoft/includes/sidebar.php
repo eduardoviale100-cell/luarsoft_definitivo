@@ -80,6 +80,7 @@ $menu = [
         'titulo' => 'Sistema',
         'items' => [
             ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Usuarios', 'icon' => 'bi-person-lock', 'url' => 'modules/usuarios/listado.php'],
+            ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Migrar Tenants', 'icon' => 'bi-database-fill-gear', 'url' => 'admin/migrar_tenants.php'],
         ],
     ],
 ];

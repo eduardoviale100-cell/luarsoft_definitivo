@@ -10,10 +10,12 @@ require_once __DIR__ . '/../../config/conexion.php';
 require_once __DIR__ . '/../../includes/funciones.php';
 require_once __DIR__ . '/../../includes/auth.php';
 require_once __DIR__ . '/../../includes/tenant_manager.php';
+require_once __DIR__ . '/../../includes/permisos.php';
 
-// Solo el Administrador Master puede ver esta pantalla
-if (!esAdministrador()) {
-    flash('error', 'Acceso denegado: este módulo es exclusivo del Administrador.');
+// REGLA DE ORO 1: Solo el SuperAdmin Global puede acceder a este módulo.
+// Un Administrador local de empresa NO puede gestionar usuarios del sistema.
+if (!esSuperAdmin()) {
+    flash('error', 'Acceso denegado: este módulo es exclusivo del Administrador Global.');
     header('Location: ' . url('index.php'));
     exit;
 }
@@ -361,7 +363,8 @@ include __DIR__ . '/../../includes/layout_top.php';
                 
                 <div class="p-3 bg-light rounded border border-danger-subtle">
                     <div class="form-check">
-                        <input class="form-check-input" type="checkbox" name="borrar_bd_fisica" value="1" id="checkBorrarBd">
+                        <input class="form-check-input" type="checkbox" name="borrar_bd_fisica" value="1" id="checkBorrarBd" checked>
+                        <input type="hidden" name="borrar_bd" value="1">
                         <label class="form-check-label fw-bold text-danger" for="checkBorrarBd">
                             <i class="bi bi-database-x me-1"></i> Eliminar también la base de datos MySQL física (<code id="delBdTexto"></code>)
                         </label>
@@ -434,7 +437,7 @@ function abrirModalEliminar(id, usuario, nombreBd) {
     document.getElementById('delIdUsuario').value = id;
     document.getElementById('delNombreUsuario').innerText = usuario;
     document.getElementById('delBdTexto').innerText = nombreBd;
-    document.getElementById('checkBorrarBd').checked = false;
+    document.getElementById('checkBorrarBd').checked = true;
     new bootstrap.Modal(document.getElementById('modalEliminar')).show();
 }
 </script>

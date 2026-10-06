@@ -54,9 +54,10 @@ if (!$fila) {
 
 session_regenerate_id(true);
 $_SESSION['usuario']    = $fila['usuario'];
-$_SESSION['id_usuario'] = $fila['id_usuario'];
+$_SESSION['id_usuario'] = (int)$fila['id_usuario'];
+$_SESSION['usuario_id'] = (int)$fila['id_usuario'];
 $_SESSION['rol']        = $fila['rol'] ?? 'Administrador';
-$_SESSION['permisos']   = decodificarPermisos($fila['permisos'] ?? null);
+$_SESSION['permisos']   = decodificarPermisos($fila['permisos'] ?? null, $fila['rol'] ?? null);
 
 header('Location: ' . url('index.php'));
 exit;

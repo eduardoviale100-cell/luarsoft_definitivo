@@ -78,17 +78,30 @@ $menu = [
     ],
     'sistema' => [
         'titulo' => 'Sistema',
+        'superadmin_only' => true,  // REGLA DE ORO 2: Solo visible para SuperAdmin
         'items' => [
-            ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Usuarios', 'icon' => 'bi-person-lock', 'url' => 'modules/usuarios/listado.php'],
-            ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Migrar Tenants', 'icon' => 'bi-database-fill-gear', 'url' => 'admin/migrar_tenants.php'],
+            ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Gestión de Usuarios', 'icon' => 'bi-person-gear', 'url' => 'modules/usuarios/listado.php'],
+        ],
+    ],
+    'plataforma' => [
+        'titulo' => 'Plataforma Global',
+        'superadmin_only' => true,  // Solo visible para SuperAdmins
+        'items' => [
+            ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Gestión de Tenants', 'icon' => 'bi-buildings', 'url' => 'admin/migrar_tenants.php'],
+            ['tipo' => 'link', 'perm' => 'usuarios', 'label' => 'Usuarios del Sistema', 'icon' => 'bi-database-fill-gear', 'url' => 'modules/usuarios/listado.php'],
         ],
     ],
 ];
 
-// Matriz de Permisos: se descarta de la navegación todo ítem (link o
-// grupo completo) al que el usuario en sesión no tenga acceso. Un
-// Administrador ve el menú completo, igual que antes de esta mejora.
+// Filtrar el menú según permisos del usuario en sesión.
+// - Bloques marcados como 'superadmin_only' solo se muestran a SuperAdmins.
+// - El resto se filtra por permisos de módulo del usuario.
 foreach ($menu as $bloqueKey => $bloqueDef) {
+    // Ocultar bloque completo si es exclusivo de SuperAdmin y el usuario no lo es
+    if (!empty($bloqueDef['superadmin_only']) && !esSuperAdmin()) {
+        unset($menu[$bloqueKey]);
+        continue;
+    }
     $menu[$bloqueKey]['items'] = array_values(array_filter($bloqueDef['items'], function ($it) {
         return tienePermiso($it['perm']);
     }));

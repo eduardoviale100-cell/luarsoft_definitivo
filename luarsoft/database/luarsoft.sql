@@ -376,10 +376,10 @@ CREATE TABLE `usuarios` (
 --
 
 INSERT INTO `usuarios` (`id_usuario`, `usuario`, `rol`, `permisos`, `foto`, `contraseña`, `fecha_creacion`) VALUES
-(1, 'Luis Fernández', 'Administrador', '', 'Luis_Fern__ndez_1787943231.png', '$2y$10$8h9v0C0PeurOiMk2ShhsJeWPozSqzDG9Pbl7Cn89T/d.wlOn62ram', '2026-08-15 02:51:54'),
+(1, 'Luis Fernández', 'Administrador', 'dashboard,pos,clientes,productos,tecnicos,ordenes,ventas,compras,reportes,usuarios,configuracion', 'Luis_Fern__ndez_1787943231.png', '$2y$10$8h9v0C0PeurOiMk2ShhsJeWPozSqzDG9Pbl7Cn89T/d.wlOn62ram', '2026-08-15 02:51:54'),
 (2, 'Eduardo Viale', 'Cajero / Usuario', 'dashboard,pos', 'Eduardo_Viale_1788384881.jpg', '$2y$10$H5VAHuIAhaSydCyrNfWd1u3ENgZiEnd1WfacGiShn1xil6BOhBa86', '2026-08-15 02:51:54'),
 (3, 'eduardo', 'Cajero / Usuario', 'dashboard,pos', 'eduardo_1788384780.png', '$2y$10$nj01dbujs3CVSu3qEZGhueU8xXWRWof7RXtacJCBJVBx5mW1QjvTa', '2026-09-02 21:31:10'),
-(4, 'admin', 'Administrador', '', NULL, '$2y$10$8h9v0C0PeurOiMk2ShhsJeWPozSqzDG9Pbl7Cn89T/d.wlOn62ram', '2026-10-05 10:31:00');
+(4, 'admin', 'Administrador', 'dashboard,pos,clientes,productos,tecnicos,ordenes,ventas,compras,reportes,usuarios,configuracion', NULL, '$2y$10$8h9v0C0PeurOiMk2ShhsJeWPozSqzDG9Pbl7Cn89T/d.wlOn62ram', '2026-10-05 10:31:00');
 
 -- --------------------------------------------------------
 

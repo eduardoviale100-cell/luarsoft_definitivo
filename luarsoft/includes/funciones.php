@@ -133,6 +133,58 @@ function eliminarImagenReferencia(?string $nombreArchivo, string $subcarpeta): v
     if (is_file($ruta)) { @unlink($ruta); }
 }
 
+/**
+ * Procesa la subida de una foto de perfil (JPG, PNG, WEBP) a uploads/perfiles/
+ * (y sincroniza con uploads/usuarios/ por compatibilidad con visualizadores).
+ *
+ * @param array $archivo El array $_FILES['foto']
+ * @param string|null $destDir Ruta opcional del directorio de destino (por defecto uploads/perfiles/)
+ * @return string|null Nombre del archivo guardado o null si no se seleccionó ninguna imagen
+ * @throws RuntimeException Si la extensión no es válida o si excede el tamaño máximo
+ */
+function subirFotoPerfil(array $archivo, ?string $destDir = null): ?string
+{
+    if (!isset($archivo['error']) || $archivo['error'] === UPLOAD_ERR_NO_FILE) {
+        return null;
+    }
+    if ($archivo['error'] !== UPLOAD_ERR_OK) {
+        throw new RuntimeException('Error al subir la imagen de perfil.');
+    }
+
+    $extensionesPermitidas = ['jpg', 'jpeg', 'png', 'webp'];
+    $maxSize = 5 * 1024 * 1024; // 5 MB
+
+    if ($archivo['size'] > $maxSize) {
+        throw new RuntimeException('La imagen supera el tamaño máximo permitido (5 MB).');
+    }
+
+    $extension = strtolower(pathinfo($archivo['name'], PATHINFO_EXTENSION));
+    if (!in_array($extension, $extensionesPermitidas, true)) {
+        throw new RuntimeException('Formato de imagen no permitido. Use JPG, PNG o WEBP.');
+    }
+
+    $dirPerfiles = $destDir ?: (__DIR__ . '/../uploads/perfiles/');
+    if (!is_dir($dirPerfiles)) {
+        @mkdir($dirPerfiles, 0755, true);
+    }
+
+    $nombreArchivo = 'perfil_' . bin2hex(random_bytes(6)) . '_' . time() . '.' . $extension;
+    $rutaDestino = rtrim($dirPerfiles, '/\\') . DIRECTORY_SEPARATOR . $nombreArchivo;
+
+    if (!move_uploaded_file($archivo['tmp_name'], $rutaDestino)) {
+        throw new RuntimeException('Error al mover la imagen al destino final.');
+    }
+
+    // Copiar también a uploads/usuarios/ para asegurar que los visualizadores de cabecera/perfil la encuentren siempre
+    $dirUsuarios = __DIR__ . '/../uploads/usuarios/';
+    if (!is_dir($dirUsuarios)) {
+        @mkdir($dirUsuarios, 0755, true);
+    }
+    @copy($rutaDestino, $dirUsuarios . $nombreArchivo);
+
+    return $nombreArchivo;
+}
+
 /* ==========================================================================
  * GENERADOR DE CÓDIGO DE PRODUCTO (SKU) — CATEGORIA-PRODUCTO-NNN
  * Usado por modules/productos/generar_codigo_producto.php (autorelleno en

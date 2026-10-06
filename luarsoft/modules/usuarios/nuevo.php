@@ -35,15 +35,25 @@ if (isset($_POST['guardar'])) {
     } elseif ($clave !== $claveConfirmar) {
         $error = 'Las contraseñas no coinciden.';
     } else {
-        // Ejecutar creación del usuario y aprovisionamiento automático de su BD
-        $resultado = crearUsuarioSistema($usuario, $nombreCompleto, $clave, 'Normal');
+        // Procesar subida de foto de perfil opcional
+        $fotoNombre = null;
+        try {
+            $fotoNombre = subirFotoPerfil($_FILES['foto'] ?? []);
+        } catch (RuntimeException $e) {
+            $error = $e->getMessage();
+        }
 
-        if ($resultado['success']) {
-            flash('success', $resultado['mensaje']);
-            header('Location: ' . url('modules/usuarios/listado.php'));
-            exit;
-        } else {
-            $error = $resultado['error'];
+        if ($error === '') {
+            // Ejecutar creación del usuario y aprovisionamiento automático de su BD
+            $resultado = crearUsuarioSistema($usuario, $nombreCompleto, $clave, 'Normal', $fotoNombre);
+
+            if ($resultado['success']) {
+                flash('success', $resultado['mensaje']);
+                header('Location: ' . url('modules/usuarios/listado.php'));
+                exit;
+            } else {
+                $error = $resultado['error'];
+            }
         }
     }
 }
@@ -65,7 +75,7 @@ include __DIR__ . '/../../includes/layout_top.php';
             <div class="alert alert-danger"><i class="bi bi-exclamation-triangle-fill me-2"></i> <?= h($error) ?></div>
         <?php endif; ?>
 
-        <form method="POST" id="formNuevoUsuario">
+        <form method="POST" id="formNuevoUsuario" enctype="multipart/form-data">
             <div class="row g-3">
                 <div class="col-md-6">
                     <label class="form-label fw-bold"><i class="bi bi-card-heading"></i> Nombre Completo</label>
@@ -87,6 +97,12 @@ include __DIR__ . '/../../includes/layout_top.php';
                 <div class="col-md-6">
                     <label class="form-label fw-bold"><i class="bi bi-key-fill"></i> Confirmar Contraseña</label>
                     <input type="password" name="contrasena_confirmar" class="form-control" placeholder="Repite la contraseña" required>
+                </div>
+
+                <div class="col-md-12">
+                    <label class="form-label fw-bold"><i class="bi bi-image"></i> Foto de Perfil</label>
+                    <input type="file" name="foto" class="form-control" accept="image/jpeg,image/png,image/webp">
+                    <small class="text-muted">Formatos permitidos: JPG, PNG, WEBP. Tamaño máximo: 5 MB (Opcional).</small>
                 </div>
             </div>
 

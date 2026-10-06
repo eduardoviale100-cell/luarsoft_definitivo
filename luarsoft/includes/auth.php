@@ -19,30 +19,10 @@
  * que sí tenga acceso.
  */
 
-if (empty($_SESSION['usuario']) || !is_string($_SESSION['usuario'])) {
-    // Session corrupted or missing — force re-login
-    unset($_SESSION['usuario'], $_SESSION['id_usuario'], $_SESSION['rol'], $_SESSION['permisos']);
-    header('Location: ' . url('login.php'));
+if (empty($_SESSION['usuario']) || empty($_SESSION['id_usuario'])) {
+    header('Location: login.php');
     exit;
 }
 
 require_once __DIR__ . '/permisos.php';
-
-if (!isset($_SESSION['rol']) && !empty($_SESSION['usuario'])) {
-    require_once __DIR__ . '/tenant_manager.php';
-    $master = masterConexion();
-    $stmtSesion = mysqli_prepare($master, "SELECT rol, nombre_bd_asignada FROM usuarios_sistema WHERE usuario = ? LIMIT 1");
-    if ($stmtSesion) {
-        mysqli_stmt_bind_param($stmtSesion, "s", $_SESSION['usuario']);
-        mysqli_stmt_execute($stmtSesion);
-        $filaSesion = mysqli_stmt_get_result($stmtSesion)->fetch_assoc();
-        $_SESSION['rol'] = $filaSesion['rol'] ?? 'Normal';
-        if (empty($_SESSION['tenant_db'])) {
-            $_SESSION['tenant_db'] = $filaSesion['nombre_bd_asignada'] ?? 'luarsoft';
-        }
-    } else {
-        $_SESSION['rol'] = 'Normal';
-    }
-}
-
 verificarPermisoActual();

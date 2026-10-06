@@ -52,9 +52,10 @@ if (isset($_POST['actualizar'])) {
         } else {
             $foto = $usuarioActual['foto'] ?? null;
             try {
-                $nuevaFoto = subirImagenReferencia($_FILES['foto'] ?? [], 'usuarios', $usuario);
+                $nuevaFoto = subirFotoPerfil($_FILES['foto'] ?? []);
                 if ($nuevaFoto !== null) {
                     eliminarImagenReferencia($usuarioActual['foto'] ?? null, 'usuarios');
+                    eliminarImagenReferencia($usuarioActual['foto'] ?? null, 'perfiles');
                     $foto = $nuevaFoto;
                 }
             } catch (RuntimeException $e) {

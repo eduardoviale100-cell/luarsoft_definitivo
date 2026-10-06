@@ -2,15 +2,35 @@
 /**
  * logout.php
  * ------------------------------------------------------------------
- * Cierra la sesión del usuario. Se mantiene el comportamiento
- * original (destruir la sesión); ahora redirige a sesion_cerrada.php,
- * que ofrece volver a entrar o ir a la web pública.
+ * Cierra la sesión del usuario de forma limpia y completa:
+ *   1. Vacía el array $_SESSION
+ *   2. Elimina la cookie de sesión del navegador
+ *   3. Destruye el archivo de sesión en el servidor
+ *   4. Redirige al login
  */
-session_start();
-session_unset();
+if (session_status() === PHP_SESSION_NONE) {
+    session_start();
+}
+
+// Vaciar todas las variables de sesión
+$_SESSION = [];
+
+// Eliminar la cookie de sesión del navegador
+if (ini_get('session.use_cookies')) {
+    $params = session_get_cookie_params();
+    setcookie(
+        session_name(),
+        '',
+        time() - 42000,
+        $params['path'],
+        $params['domain'],
+        $params['secure'],
+        $params['httponly']
+    );
+}
+
+// Destruir la sesión en el servidor
 session_destroy();
 
-require_once __DIR__ . '/config/conexion.php';
-require_once __DIR__ . '/includes/funciones.php';
-header('Location: ' . url('sesion_cerrada.php'));
+header('Location: login.php');
 exit;

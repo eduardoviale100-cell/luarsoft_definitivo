@@ -8,6 +8,7 @@
  */
 
 require_once __DIR__ . '/../config/conexion.php';
+require_once __DIR__ . '/permisos.php';
 
 /**
  * Retorna una conexión exclusiva a la base de datos central de control (luarsoft).
@@ -96,10 +97,10 @@ function inicializarSistemaMultiTenant(): void
         ");
         mysqli_stmt_bind_param($stmt, "s", $hashAdmin);
         mysqli_stmt_execute($stmt);
-    }
 
-    // 3. Asegurar que luarsoft_db_admin exista y tenga las tablas
-    provisionarBdTenant('luarsoft_db_admin', 'admin', 'Administrador Principal', password_hash('admin123', PASSWORD_BCRYPT), 'Admin');
+        // 3. Asegurar que luarsoft_db_admin exista y tenga las tablas
+        provisionarBdTenant('luarsoft_db_admin', 'admin', 'Administrador Principal', $hashAdmin, 'Admin');
+    }
 }
 
 /**
@@ -157,7 +158,7 @@ function importarTablasTenant(string $nombreBd): bool
 /**
  * Crea físicamente la base de datos del usuario e inserta su esquema de 13 tablas.
  */
-function provisionarBdTenant(string $nombreBd, string $usuario, string $nombreCompleto, string $hashClave, string $rol = 'Normal'): bool
+function provisionarBdTenant(string $nombreBd, string $usuario, string $nombreCompleto, string $hashClave, string $rol = 'Normal', bool $forzarReimport = false, ?string $foto = null): bool
 {
     $serverConn = mysqli_connect(DB_HOST, DB_USER, DB_PASS);
     if (!$serverConn) {
@@ -170,23 +171,36 @@ function provisionarBdTenant(string $nombreBd, string $usuario, string $nombreCo
         mysqli_close($serverConn);
         return false;
     }
+
+    // Verificar si ya tiene tablas
+    $yaTieneTablas = false;
+    if (!$forzarReimport) {
+        $check = mysqli_query($serverConn, "SHOW TABLES FROM `{$nombreBd}`");
+        if ($check && mysqli_num_rows($check) >= 5) {
+            $yaTieneTablas = true;
+        }
+    }
     mysqli_close($serverConn);
 
-    // 2. Importar tablas del sistema
-    importarTablasTenant($nombreBd);
+    // 2. Importar tablas del sistema solo si no existen o se solicita forzar
+    if (!$yaTieneTablas) {
+        importarTablasTenant($nombreBd);
+    }
 
     // 3. Registrar al usuario dentro de su propia tabla `usuarios` local
     $connTenant = mysqli_connect(DB_HOST, DB_USER, DB_PASS, $nombreBd);
     if ($connTenant) {
         mysqli_set_charset($connTenant, 'utf8mb4');
-        $rolInterno = ($rol === 'Admin') ? 'Administrador' : 'Administrador'; // En su propia BD, el usuario es dueño total
+        $rolInterno = 'Administrador'; // En su propia BD, el usuario es dueño total
+        // FIX: Asignar permisos completos al Administrador del tenant (antes quedaba en '' o NULL)
+        $permisosAdmin = PERMISOS_ADMIN_COMPLETOS_STR;
         $stmt = mysqli_prepare($connTenant, "
-            INSERT INTO `usuarios` (`usuario`, `rol`, `permisos`, `contraseña`)
-            VALUES (?, ?, '', ?)
-            ON DUPLICATE KEY UPDATE `contraseña` = VALUES(`contraseña`), `rol` = VALUES(`rol`)
+            INSERT INTO `usuarios` (`usuario`, `rol`, `permisos`, `foto`, `contraseña`)
+            VALUES (?, ?, ?, ?, ?)
+            ON DUPLICATE KEY UPDATE `contraseña` = VALUES(`contraseña`), `rol` = VALUES(`rol`), `permisos` = VALUES(`permisos`), `foto` = COALESCE(VALUES(`foto`), `foto`)
         ");
         if ($stmt) {
-            mysqli_stmt_bind_param($stmt, "sss", $usuario, $rolInterno, $hashClave);
+            mysqli_stmt_bind_param($stmt, "sssss", $usuario, $rolInterno, $permisosAdmin, $foto, $hashClave);
             mysqli_stmt_execute($stmt);
         }
         mysqli_close($connTenant);
@@ -198,7 +212,7 @@ function provisionarBdTenant(string $nombreBd, string $usuario, string $nombreCo
 /**
  * Registra un nuevo usuario en luarsoft.usuarios_sistema y crea su BD dedicada.
  */
-function crearUsuarioSistema(string $usuario, string $nombreCompleto, string $clave, string $rol = 'Normal'): array
+function crearUsuarioSistema(string $usuario, string $nombreCompleto, string $clave, string $rol = 'Normal', ?string $foto = null): array
 {
     $master = masterConexion();
 
@@ -228,7 +242,7 @@ function crearUsuarioSistema(string $usuario, string $nombreCompleto, string $cl
     $rolValido = in_array($rol, ['Admin', 'Normal'], true) ? $rol : 'Normal';
 
     // 1. Aprovisionar físicamente la base de datos del usuario
-    $okBd = provisionarBdTenant($nombreBdAsignada, $usuarioLimpio, $nombreLimpio, $hashClave, $rolValido);
+    $okBd = provisionarBdTenant($nombreBdAsignada, $usuarioLimpio, $nombreLimpio, $hashClave, $rolValido, false, $foto);
     if (!$okBd) {
         return ['success' => false, 'error' => "No se pudo crear la base de datos {$nombreBdAsignada}. Verifique permisos de MySQL."];
     }
@@ -276,22 +290,32 @@ function cambiarTenantActivo(string $nuevaBd): bool
         session_start();
     }
 
-    // Solo un Administrador puede cambiar de base de datos
+    // Solo un Administrador o SuperAdmin puede cambiar de base de datos
     $rol = $_SESSION['rol'] ?? '';
-    if (!in_array($rol, ['Admin', 'Administrador'], true)) {
+    $esSuperAdmin = !empty($_SESSION['es_superadmin']) || $rol === 'superadmin';
+    if (!$esSuperAdmin && !in_array($rol, ['Admin', 'Administrador'], true)) {
         return false;
     }
 
-    $master = masterConexion();
-    $stmt = mysqli_prepare($master, "SELECT nombre_bd_asignada, usuario FROM `usuarios_sistema` WHERE `nombre_bd_asignada` = ? LIMIT 1");
-    mysqli_stmt_bind_param($stmt, "s", $nuevaBd);
-    mysqli_stmt_execute($stmt);
-    $fila = mysqli_stmt_get_result($stmt)->fetch_assoc();
-
-    if ($fila) {
-        $_SESSION['tenant_db'] = $fila['nombre_bd_asignada'];
-        $_SESSION['tenant_usuario_viendo'] = $fila['usuario'];
+    if ($nuevaBd === 'luarsoft' || $nuevaBd === 'luarsoft_db_admin') {
+        $_SESSION['tenant_db'] = 'luarsoft';
+        $_SESSION['modo_soporte'] = false;
+        unset($_SESSION['tenant_usuario_viendo']);
         return true;
+    }
+
+    $master = masterConexion();
+    $stmt = mysqli_prepare($master, "SELECT nombre_bd_asignada, usuario FROM `usuarios_sistema` WHERE `nombre_bd_asignada` = ? AND `estado` = 'activo' LIMIT 1");
+    if ($stmt) {
+        mysqli_stmt_bind_param($stmt, "s", $nuevaBd);
+        mysqli_stmt_execute($stmt);
+        $res = mysqli_stmt_get_result($stmt);
+        if ($res && ($fila = $res->fetch_assoc())) {
+            $_SESSION['tenant_db'] = $fila['nombre_bd_asignada'];
+            $_SESSION['tenant_usuario_viendo'] = $fila['usuario'];
+            $_SESSION['modo_soporte'] = true;
+            return true;
+        }
     }
 
     return false;
@@ -485,15 +509,43 @@ function eliminarTenantCompleto(int $idUsuario, bool $borrarBd = false): array
             return ['success' => false, 'error' => "Operación denegada: La base de datos '{$nombreBd}' es una base de datos maestra protegida."];
         }
 
-        // Ejecutar DROP DATABASE seguro
-        $serverConn = @mysqli_connect(DB_HOST, DB_USER, DB_PASS);
-        if ($serverConn) {
-            $nombreBdEscaped = mysqli_real_escape_string($serverConn, $nombreBd);
-            $sqlDrop = "DROP DATABASE IF EXISTS `{$nombreBdEscaped}`";
-            if (mysqli_query($serverConn, $sqlDrop)) {
-                $bdBorradaFisicamente = true;
+        // Ejecutar DROP DATABASE seguro con manejo de excepciones (try-catch)
+        try {
+            $sqlDrop = "DROP DATABASE IF EXISTS `" . $nombreBd . "`";
+
+            // Intentar ejecución vía PDO con manejo de excepciones
+            if (class_exists('PDO')) {
+                try {
+                    $dsn = "mysql:host=" . DB_HOST . ";charset=utf8mb4";
+                    $pdoDrop = new PDO($dsn, DB_USER, DB_PASS, [
+                        PDO::ATTR_ERRMODE => PDO::ERRMODE_EXCEPTION
+                    ]);
+                    $pdoDrop->exec($sqlDrop);
+                    $bdBorradaFisicamente = true;
+                } catch (\Throwable $ePdo) {
+                    // Fallback a mysqli si la conexión PDO falla
+                    $serverConn = @mysqli_connect(DB_HOST, DB_USER, DB_PASS);
+                    if ($serverConn) {
+                        $nombreBdEscaped = mysqli_real_escape_string($serverConn, $nombreBd);
+                        if (mysqli_query($serverConn, "DROP DATABASE IF EXISTS `{$nombreBdEscaped}`")) {
+                            $bdBorradaFisicamente = true;
+                        }
+                        mysqli_close($serverConn);
+                    }
+                }
+            } else {
+                $serverConn = @mysqli_connect(DB_HOST, DB_USER, DB_PASS);
+                if ($serverConn) {
+                    $nombreBdEscaped = mysqli_real_escape_string($serverConn, $nombreBd);
+                    if (mysqli_query($serverConn, "DROP DATABASE IF EXISTS `{$nombreBdEscaped}`")) {
+                        $bdBorradaFisicamente = true;
+                    }
+                    mysqli_close($serverConn);
+                }
             }
-            mysqli_close($serverConn);
+        } catch (\Throwable $e) {
+            // Previene errores fatales si la BD ya no existe o faltan privilegios MySQL
+            error_log("Advertencia al eliminar la base de datos '{$nombreBd}': " . $e->getMessage());
         }
     }
 

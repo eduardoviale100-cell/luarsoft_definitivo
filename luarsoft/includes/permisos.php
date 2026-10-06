@@ -33,10 +33,28 @@ const MODULOS_SISTEMA = [
 /** Módulos marcados por defecto para una cuenta nueva de tipo Cajero / Usuario. */
 const PERMISOS_CAJERO_DEFECTO = ['dashboard', 'pos'];
 
+/**
+ * Lista completa de permisos para un Administrador.
+ * Se usa al provisionar tenants, en migraciones retroactivas y al
+ * hidratar sesiones para asegurar que nunca quede un Admin sin acceso.
+ */
+const PERMISOS_ADMIN_COMPLETOS = [
+    'dashboard', 'pos', 'clientes', 'productos', 'tecnicos',
+    'ordenes', 'ventas', 'compras', 'reportes', 'usuarios', 'configuracion',
+];
+
+/** Cadena ya formateada para INSERT/UPDATE directo en BD. */
+const PERMISOS_ADMIN_COMPLETOS_STR = 'dashboard,pos,clientes,productos,tecnicos,ordenes,ventas,compras,reportes,usuarios,configuracion';
+
 /** Convierte el string de permisos guardado en BD (separado por comas) a array. */
-function decodificarPermisos(?string $permisosStr): array
+function decodificarPermisos(?string $permisosStr, ?string $rol = null): array
 {
-    if (!$permisosStr) { return []; }
+    // SuperAdmin y Administrador locales siempre tienen acceso total
+    if ($rol !== null && in_array($rol, ['superadmin', 'Admin', 'Administrador'], true)) {
+        return PERMISOS_ADMIN_COMPLETOS;
+    }
+    // Si el valor está vacío sin rol reconocido, devolver array vacío
+    if (!$permisosStr || trim($permisosStr) === '') { return []; }
     return array_values(array_filter(array_map('trim', explode(',', $permisosStr))));
 }
 
@@ -47,23 +65,41 @@ function codificarPermisos(array $permisos): string
     return implode(',', $validos);
 }
 
-/** true si el usuario en sesión es Administrador Principal (acceso total + gestión de usuarios). */
+/**
+ * true si el usuario en sesión es SuperAdmin GLOBAL de la plataforma
+ * (acceso a gestión de tenants, BD central, configuración del sistema).
+ */
+function esSuperAdmin(): bool
+{
+    return ($_SESSION['es_superadmin'] ?? false) === true
+        || ($_SESSION['rol'] ?? '') === 'superadmin';
+}
+
+/**
+ * true si el usuario es Administrador (local o global).
+ * Un Administrador local gestiona su propia empresa.
+ * Un SuperAdmin gestiona toda la plataforma.
+ * Ambos tienen acceso total a los módulos operativos del ERP.
+ */
 function esAdministrador(): bool
 {
     $rol = $_SESSION['rol'] ?? '';
-    return in_array($rol, ['Admin', 'Administrador'], true);
+    return in_array($rol, ['superadmin', 'Admin', 'Administrador'], true);
 }
 
 /** true si el usuario en sesión puede acceder al módulo indicado. */
 function tienePermiso(string $modulo): bool
 {
-    // El módulo de Usuarios / Sistema es exclusivo del Administrador
-    if ($modulo === 'usuarios') {
-        return esAdministrador();
+    // El Administrador SIEMPRE tiene acceso total a todos los módulos
+    if (esAdministrador()) {
+        return true;
     }
-    // Todos los demás módulos (POS, Clientes, Productos, Ventas, Órdenes, Técnicos, Reportes)
-    // están habilitados al 100% tanto para Admin como para Usuario Normal en su propia BD.
-    return true;
+    // Para usuarios no-admin, verificar si el módulo está asignado en su lista de permisos
+    $permisos = $_SESSION['permisos'] ?? [];
+    if (is_string($permisos)) {
+        $permisos = decodificarPermisos($permisos);
+    }
+    return in_array($modulo, $permisos, true);
 }
 
 /**

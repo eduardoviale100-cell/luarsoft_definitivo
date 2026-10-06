@@ -20,16 +20,18 @@ require_once __DIR__ . '/../includes/funciones.php';
 require_once __DIR__ . '/../includes/auth.php';
 require_once __DIR__ . '/../includes/tenant_manager.php';
 
-// 1. Control de Acceso Estricto: Exigir Administrador Master
-if (!esAdministrador() || ($_SESSION['rol'] ?? '') !== 'Admin') {
+// 1. Control de Acceso Estricto: Exigir SuperAdmin de la Plataforma
+require_once __DIR__ . '/../includes/permisos.php';
+if (!esSuperAdmin()) {
     http_response_code(403);
-    die('<div style="font-family:sans-serif; padding:40px; text-align:center;"><h2>Acceso Denegado (403)</h2><p>Se requieren privilegios de Administrador Master para ejecutar migraciones del sistema.</p></div>');
+    die('<div style="font-family:sans-serif; padding:40px; text-align:center;"><h2>Acceso Denegado (403)</h2><p>Se requieren privilegios de Administrador Global (SuperAdmin) para ejecutar migraciones del sistema.</p><a href="../index.php">Volver al inicio</a></div>');
 }
 
 $titulo_pagina = "Migración de Tenants · LuarSoft";
 $ejecutar = isset($_POST['ejecutar_migracion']) || isset($_GET['autoejecutar']);
 
 // 2. Definición de Consultas de Migración / Actualización de Estructura (Idempotentes)
+
 $consultasMigracion = [
     "CREATE TABLE IF NOT EXISTS `migraciones_log` (
         `id` INT AUTO_INCREMENT PRIMARY KEY,
@@ -39,7 +41,13 @@ $consultasMigracion = [
     
     "ALTER TABLE `productos` ADD COLUMN IF NOT EXISTS `codigo_barras` VARCHAR(50) NULL AFTER `codigo`",
     "ALTER TABLE `clientes` ADD COLUMN IF NOT EXISTS `tipo_documento` VARCHAR(20) DEFAULT 'DNI' AFTER `documento`",
-    "CREATE INDEX IF NOT EXISTS `idx_ventas_fecha` ON `ventas` (`fecha`)"
+    "CREATE INDEX IF NOT EXISTS `idx_ventas_fecha` ON `ventas` (`fecha`)",
+
+    // FIX BUG: Corregir usuarios Administrador con permisos vacíos o NULL
+    // (provisionados antes del fix en provisionarBdTenant). Idempotente.
+    "UPDATE `usuarios` SET `permisos` = '" . PERMISOS_ADMIN_COMPLETOS_STR . "'
+     WHERE `rol` = 'Administrador'
+       AND (`permisos` IS NULL OR `permisos` = '' OR TRIM(`permisos`) = '')",
 ];
 
 $reporteResultados = [];

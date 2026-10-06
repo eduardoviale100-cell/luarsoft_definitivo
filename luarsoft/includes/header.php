@@ -23,7 +23,7 @@ require_once __DIR__ . '/tenant_manager.php';
 
 $bdActiva = $_SESSION['tenant_db'] ?? DB_NAME;
 $listaTenants = [];
-if (esAdministrador()) {
+if (esSuperAdmin()) {
     $listaTenants = listarUsuariosSistema();
 }
 ?>
@@ -39,7 +39,7 @@ if (esAdministrador()) {
     </div>
 
     <div class="topbar-right">
-        <?php if (esAdministrador() && !empty($listaTenants)): ?>
+        <?php if (esSuperAdmin() && !empty($listaTenants)): ?>
             <div class="dropdown me-1">
                 <button class="btn btn-sm <?= ($bdActiva !== 'luarsoft_db_admin' && $bdActiva !== 'luarsoft') ? 'btn-warning text-dark fw-bold' : 'btn-outline-success' ?> dropdown-toggle d-flex align-items-center gap-1" type="button" data-bs-toggle="dropdown" aria-expanded="false" title="Cambiar base de datos activa (Modo Soporte)">
                     <i class="bi bi-database-fill"></i>
@@ -104,7 +104,7 @@ if (esAdministrador()) {
     </div>
 </header>
 
-<?php if (esAdministrador() && $bdActiva !== 'luarsoft_db_admin' && $bdActiva !== 'luarsoft'): ?>
+<?php if (esSuperAdmin() && $bdActiva !== 'luarsoft_db_admin' && $bdActiva !== 'luarsoft'): ?>
 <div class="support-mode-banner bg-warning text-dark px-3 py-2 d-flex align-items-center justify-content-between border-bottom shadow-sm" style="font-size: 0.85rem;">
     <div class="d-flex align-items-center gap-2 flex-wrap">
         <span class="badge bg-danger text-white"><i class="bi bi-shield-exclamation me-1"></i> MODO SOPORTE</span>
